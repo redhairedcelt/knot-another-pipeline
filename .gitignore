@@ -88,6 +88,13 @@ data/raw/
 data/interim/
 data/tmp/
 
+# --- Terraform state and artifacts ---
+*.tfstate
+*.tfstate.*
+*.terraform/
+.terraform/
+.terraform.lock.hcl
+
 # ============================
 # End of .gitignore
 # ============================
