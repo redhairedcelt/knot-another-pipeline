@@ -11,6 +11,8 @@ The pipeline performs the following high-level stages:
 3. Push each archive to the bronze layer in S3 using Hive-style partitions (`year=YYYY/month=MM/day=DD`).
 4. Stream CSV contents into chunked DataFrames, derive date partitions from the `BaseDateTime` column, assign deterministic bucket IDs using the MMSI, and write partitioned + bucketed Parquet files to the silver layer.
 
+> Glue/Athena normalise the silver-schema column names to lowercase with underscores (`BaseDateTime` → `base_date_time`, `LAT` → `latitude`, etc.). Downstream SQL should reference the normalised names or call `SHOW COLUMNS FROM knap_ais.silver_ais` before building CTAS jobs.
+
 ## Environment Setup
 
 1. Create or update the conda environment:
@@ -65,6 +67,16 @@ Each silver row also carries `ingested_at`, `source_file`, and `source_url` for 
 
 > The NOAA catalog currently publishes `.csv.zst` assets; the pipeline automatically detects this format, streams the zstd-compressed CSV, and writes the unified silver parquet output without requiring additional local disk space.
 
+## Athena CTAS Templates
+
+- `sql/gold/create_uid_hourly_h3.sql`: Builds the hourly H3 mart used for vessel-locale analytics. The script defensively parses mixed timestamp formats (plain spaces, ISO `T`, `Z` suffixes) via `TRY_CAST` to avoid `INVALID_FUNCTION_ARGUMENT` errors, casts timestamps to timezone-neutral values, and projects partition columns last to satisfy Athena’s Hive ordering rules.
+- `notebooks/create_pairs_daily`: Generates daily co-movement pairs directly from `knap_ais.uid_hourly_h3`, reusing the same column naming conventions and partition filters.
+
+When adapting either CTAS:
+- Start with `SHOW COLUMNS FROM knap_ais.silver_ais` / `...uid_hourly_h3` so column and partition names match the Glue catalog.
+- Wrap string-to-numeric/timestamp conversions with `TRY_CAST` and filter on the derived values instead of raw strings wherever possible.
+- Keep partition columns (`dt`, `hour`, or `year/month/day`) at the end of the `SELECT` list and in the same order declared in `partitioned_by`.
+
 ## Infrastructure as Code
 
 The Terraform module under `infra/terraform/ais_bucket` provisions a minimal S3 bucket with encryption, versioning, and a managed bucket policy suitable for AIS data. Run it as follows:
@@ -76,6 +88,18 @@ terraform apply -var="bucket_name=knap-ais-bronze-silver" -var="aws_region=us-ea
 ```
 
 Outputs include the bucket ARN for referencing in future IAM roles or event triggers. Extend the module by attaching IAM policies that bind the pipeline execution role (for ECS, Lambda, or Step Functions) to read/write the `bronze` and `silver` prefixes.
+
+To make the silver layer queryable from Athena, use the Glue catalog module in `infra/terraform/ais_glue_catalog`:
+
+```bash
+cd infra/terraform/ais_glue_catalog
+terraform init
+terraform apply -var="bucket_name=knap-ais-bronze-silver"
+```
+
+After apply, start the `knap-ais-silver` crawler in the AWS console (or add a schedule) so the `silver_` tables appear in the `knap_ais` database.
+
+For detailed schema and quality expectations, consult the bronze/silver data contracts in `docs/data_contracts.md`.
 
 ## Production Hardening Checklist
 

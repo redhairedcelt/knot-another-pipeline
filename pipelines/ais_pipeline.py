@@ -549,7 +549,8 @@ def _write_chunk_to_s3(fs: pa_fs.S3FileSystem, root_path: str, chunk: pd.DataFra
             len(partition_df),
             object_path,
         )
-        table = pa.Table.from_pandas(partition_df, preserve_index=False)
+        write_df = partition_df.drop(columns=partition_cols, errors="ignore")
+        table = pa.Table.from_pandas(write_df, preserve_index=False)
         _write_table_to_s3(fs, object_path, table, config)
 
 
