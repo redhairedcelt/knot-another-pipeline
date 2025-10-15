@@ -71,6 +71,7 @@ Each silver row also carries `ingested_at`, `source_file`, and `source_url` for 
 
 - `sql/gold/create_uid_hourly_h3.sql`: Builds the hourly H3 mart used for vessel-locale analytics. The script defensively parses mixed timestamp formats (plain spaces, ISO `T`, `Z` suffixes) via `TRY_CAST` to avoid `INVALID_FUNCTION_ARGUMENT` errors, casts timestamps to timezone-neutral values, and projects partition columns last to satisfy Athena’s Hive ordering rules.
 - `notebooks/create_pairs_daily`: Generates daily co-movement pairs directly from `knap_ais.uid_hourly_h3`, reusing the same column naming conventions and partition filters.
+- `pipelines/refresh_gold_tables.py`: Day-by-day Athena automation that can replace or append gold partitions, drops/cleans the S3 prefixes when `--mode replace` is used, recreates the external tables (bucketed + partitioned), repairs metadata, and emits reconciliation checks comparing `uid_hourly_h3` counts against the filtered silver set.
 
 When adapting either CTAS:
 - Start with `SHOW COLUMNS FROM knap_ais.silver_ais` / `...uid_hourly_h3` so column and partition names match the Glue catalog.

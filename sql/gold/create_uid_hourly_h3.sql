@@ -47,9 +47,9 @@ WITH cleaned AS (
     FROM knap_ais.silver_ais
     WHERE mmsi IS NOT NULL
       AND base_date_time IS NOT NULL
-      AND TRY_CAST(year AS INTEGER) BETWEEN year(DATE '2025-01-01') AND year(DATE '2025-01-03')
+      AND TRY_CAST(year AS INTEGER) = year(DATE '2025-01-01')
       AND TRY_CAST(month AS INTEGER) = 1
-      AND TRY_CAST(day AS INTEGER) BETWEEN 1 AND 3
+      AND TRY_CAST(day AS INTEGER) BETWEEN 1 AND 31
       AND TRY_CAST(latitude AS DOUBLE) BETWEEN -90 AND 90
       AND TRY_CAST(longitude AS DOUBLE) BETWEEN -180 AND 180
 ) 
@@ -66,7 +66,7 @@ SELECT
     EXTRACT(hour FROM date_trunc('hour', event_ts))                         AS hour
 FROM cleaned
 WHERE event_ts >= TIMESTAMP '2025-01-01 00:00:00' -- adjust lower bound
-  AND event_ts <  TIMESTAMP '2025-01-04 00:00:00' -- adjust upper bound (exclusive)
+  AND event_ts <  TIMESTAMP '2025-02-01 00:00:00' -- adjust upper bound (exclusive)
 GROUP BY
     mmsi,
     date_trunc('hour', event_ts);

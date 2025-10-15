@@ -50,6 +50,7 @@ FROM (
      AND a.hour     = b.hour
      AND a.h3_index = b.h3_index
      AND a.mmsi     < b.mmsi
+    WHERE a.dt BETWEEN DATE '2025-01-01' AND DATE '2025-01-31'
   ) w
   GROUP BY w.uid_a, w.uid_b, w.dt
 ) p
@@ -60,6 +61,7 @@ JOIN (
     COUNT(*) AS win_cnt,
     COUNT(DISTINCT h3_index) AS geo_cnt
   FROM knap_ais.uid_hourly_h3
+  WHERE dt BETWEEN DATE '2025-01-01' AND DATE '2025-01-31'
   GROUP BY mmsi, dt
 ) ua
   ON p.uid_a = ua.mmsi AND p.dt = ua.dt
@@ -70,6 +72,7 @@ JOIN (
     COUNT(*) AS win_cnt,
     COUNT(DISTINCT h3_index) AS geo_cnt
   FROM knap_ais.uid_hourly_h3
+  WHERE dt BETWEEN DATE '2025-01-01' AND DATE '2025-01-31'
   GROUP BY mmsi, dt
 ) ub
   ON p.uid_b = ub.mmsi AND p.dt = ub.dt

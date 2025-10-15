@@ -71,10 +71,11 @@ This curated mart aggregates AIS activity to an hourly grain and maps each vesse
   | `avg_lon`       | double     | Mean longitude of all positions observed during the hour. |
   | `h3_index`      | string     | H3 cell (resolution 7 by default) computed from `avg_lat`/`avg_lon`. |
   | `message_count` | bigint     | Number of AIS messages contributing to the hour. |
-  | `avg_sog`       | double     | Average speed over ground (knots); optional but recommended. |
-  | `dt`            | date       | Partition column derived from `hour_ts`. |
-  | `hour`          | integer    | Hour-of-day extracted from `hour_ts` (0–23); second partition column. |
-  | `ingested_at`   | timestamp  | Time when this gold row was produced (useful for bookkeeping). |
+| `avg_sog`       | double     | Average speed over ground (knots); optional but recommended. |
+| `dt`            | date       | Partition column derived from `hour_ts`. |
+| `hour`          | integer    | Hour-of-day extracted from `hour_ts` (0–23); second partition column. |
+| `ingested_at`   | timestamp  | Time when this gold row was produced (useful for bookkeeping). |
+| `source_row_count` | bigint | Count of silver-layer rows rolled into this hourly aggregate (used for reconciliation checks). |
 
 - **Upstream dependencies**
   - Inputs must come from the silver layer; specifically the timestamp column normalised as `base_date_time` (resolved from `BaseDateTime` and fallbacks), position columns (`latitude`/`longitude`), and speed (`sog`) must be available and non-null for the records included.
@@ -98,6 +99,7 @@ This curated mart aggregates AIS activity to an hourly grain and maps each vesse
 
 - **Implementation notes**
   - An Athena CTAS script (`sql/gold/create_uid_hourly_h3.sql`) provides a template: it truncates timestamps to the hour, computes averages, calls the H3 Lambda UDF, and writes back to the gold prefix.
+  - The automated refresh CLI (`pipelines/refresh_gold_tables.py`) handles partition-by-partition CTAS runs, recreates the Hive tables with bucket metadata, and validates that the summed `message_count`/`source_row_count` matches the number of silver records in the requested window. Use `--mode replace` to wipe and rebuild or `--mode append` to add new days.
   - Silver timestamps may arrive in multiple formats (`YYYY-MM-DD HH:MM:SS`, ISO-8601 with `T`, or already suffixed with `Z`). Normalise with `TRY_CAST(...)` first and fall back to a cleaned ISO string before calling `from_iso8601_timestamp` to avoid `INVALID_FUNCTION_ARGUMENT` failures.
   - When casting timestamps/GPS fields in Athena, prefer `CAST(... AS DOUBLE)`/`CAST(... AS TIMESTAMP)` after `TRY_CAST` so malformed rows become `NULL` and can be filtered out instead of aborting the CTAS.
   - Partition columns must be selected last and in the same order defined in `partitioned_by` to satisfy Athena’s hive layout validation.
