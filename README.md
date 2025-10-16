@@ -3,9 +3,9 @@ Experiments identifying patterns in AIS activity using reproducible IaC and data
 
 # Summary and Project Goals
 
-This is a project to experiment with and demonstrate best practices with building reusable, scalabe data pipelines, infrastructure as code, applications to support analysis, and analytic to surface new insights from complex data.
+This is a project to experiment with and demonstrate best practices with building reusable, scalabe data pipelines, infrastructure as code, applications to support analysis, and analytics to surface new insights from complex data.
 
-For example, this project will identify scalable and efficent ways to find ships traveling together and surface them.  This could lead to identifying numerous ships moving together for fishing activities or ships that regularly travel together, a topic of interest in many fields.  The example below shows two ships that moved together in the South Arm Fraser River near Vancouver on 1 January 2025.
+For example, this project will identify scalable and efficent ways to find ships traveling together and identify them.  This could lead to identifying numerous ships moving together for fishing activities or ships that regularly travel together, a topic of interest in many fields.  The example below shows two ships that moved together in the South Arm Fraser River near Vancouver on 1 January 2025 during preliminery exploration and prototyping.
 
 ![Example 1. Two ships moving together in the South Arm Fraser River near Vancouver on 1 January 2025 found during preliminery exploration and prototyping.](assets/example_1.jpg)
 
@@ -35,12 +35,12 @@ Other features of the pipeline include:
 - **Resiliency**: Downloads show progress bars, bronze uploads are skipped if the object already exists, and silver writes retry throttled S3 requests with exponential backoff before surfacing errors.
 - **Configuration**: The CLI (`pipelines/ais_pipeline.py`) exposes flags for date windows, partitioning knobs, bucket creation, and dry-run planning so the same script can power orchestration jobs or ad-hoc pulls.
 
-### Gold Layer
+### Gold Layer Pipeline
 The gold layer currently includes two tables:
 
 - **`sql/gold/create_uid_hourly_h3.sql`** distills billions of unique geospatial points into averaged hourly geospatial per ship. It cleans up the messy NOAA timestamps with a tiered `TRY_CAST`/ISO normaliser and writes the summary bucketed by hashed `mmsi` while partitioning by `dt/hour`. To make comparison of trajectories easier, the pipeline calls an H3 Lambda UDF on the averaged latitude/longitude for every vessel-hour—so downstream joins snap to hexagons instead of compute intensive distance calculations. 
 
-- **`notebooks/create_pairs_daily`** builds on that curated dataset to surface daily co-movement pairs. It joins the hourly table to itself on matching `dt`, `hour`, and `h3_index`, enforcing `a.mmsi < b.mmsi` to prevent symmetric duplicates while still letting the planner prune partitions. The script then projects hyper-local overlap metrics (`hT` for hours together and `gT` for geohashes together) plus two Jaccard-style similarities for temporal and spatial agreement, finally averaging them into a Geo-Temporal Jaccard (`gtj`). 
+- **`notebooks/create_pairs_daily`** builds on that curated dataset to surface daily co-movement pairs. It joins the hourly table to itself on matching `dt`, `hour`, and `h3_index`, enforcing `a.mmsi < b.mmsi` to prevent symmetric duplicates while still letting the planner prune partitions. The script then projects hyper-local overlap metrics (`hT` for hours together and `gT` for geohashes together) plus two Jaccard similarity scores for temporal and spatial agreement, finally averaging them into a Geo-Temporal Jaccard (`gtj`) score. 
 
 
 - The design contract for the hourly H3 mart lives in `docs/data_contracts.md` (`gold/uid_hourly_h3`) and now includes a companion pairs table fed from the hourly output.
@@ -75,6 +75,4 @@ The gold layer currently includes two tables:
 ### Co-Movement Identification
 Identifying ships that travel together over extended windows is central to understanding bottlenecks, shadow fleets, and coordinated patterns such as fishing operations. Naively looking for “similar trajectories” scales poorly, so the repo leans on a two-stage SQL pipeline that keeps the math simple but effective by creating two gold tables (see above)
 
-(add more notes about the use of jaccard as a metric, pros/cons of appraoch, etc)
-
-Together these scripts turn raw AIS data into an hour-by-hour hex grid and then into statistically defensible co-travel signals for further exploration by the explore_tracks app. It’s a compact, AWS-native workflow that leverages Athena’s strengths by pushing the heavy lifting into pre-aggregated gold tables, keeps everything partition-aware, and let analysts focus on the stories hiding in high-`gtj` pairs.
+Together these scripts turn raw AIS data into an hour-by-hour hex grid and then into statistically defensible co-travel signals for further exploration by the explore_tracks app. It’s a compact, AWS-native workflow that leverages Athena’s strengths by pushing the heavy lifting into pre-aggregated gold tables, keeps everything partition-aware, and let analysts focus on the stories hiding in high `gtj` pairs.
