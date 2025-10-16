@@ -9,6 +9,8 @@ One core objective is to uncover coordinated vessel movement (e.g., shared fishi
 
 ![Example 1. Two ships moving together in the South Arm Fraser River near Vancouver on 1 January 2025 found during preliminery exploration and prototyping.](assets/example_1.jpg)
 
+ The AIS data from January 2025 includes 215 million individual rows. Batch processing that data from silver to gold tables is completed in less than 30 minutes.
+
 ## Data
 
 This project relies on the publicly available [NOAA Marine Cadastre Vessel Traffic Data](https://hub.marinecadastre.gov/pages/vesseltraffic) site.
