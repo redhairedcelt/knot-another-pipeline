@@ -12,9 +12,9 @@ Terraform module that provisions a Glue catalog database and crawler to register
 
 ```hcl
 module "ais_glue_catalog" {
-  source       = "./infra/terraform/ais_glue_catalog"
-  aws_region   = "us-east-1"
-  bucket_name  = "knap-ais-bronze-silver"
+  source        = "./infra/terraform/ais_glue_catalog"
+  aws_region    = "us-east-1"
+  bucket_name   = "knap-ais"
   database_name = "knap_ais"
   crawler_name  = "knap-ais-silver"
 }
@@ -25,7 +25,7 @@ Then initialise and apply:
 ```bash
 cd infra/terraform/ais_glue_catalog
 terraform init
-terraform apply -var="bucket_name=knap-ais-bronze-silver"
+terraform apply -var="bucket_name=knap-ais"
 ```
 
 After provisioning, start the crawler manually (or add a schedule in the AWS console) so the `silver_ais` table appears in the `knap_ais` Glue database and becomes queryable from Athena.

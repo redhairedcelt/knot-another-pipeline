@@ -50,7 +50,7 @@ data "aws_iam_policy_document" "crawler_policy" {
     ]
     resources = [
       "arn:aws:s3:::${var.bucket_name}",
-      "arn:aws:s3:::${var.bucket_name}/${trim(var.silver_prefix, "/")}*"
+      "arn:aws:s3:::${var.bucket_name}/${trim(var.silver_prefix, "/")}/*"
     ]
   }
 

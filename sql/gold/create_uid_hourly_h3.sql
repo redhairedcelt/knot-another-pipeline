@@ -15,7 +15,7 @@ CREATE TABLE knap_ais.uid_hourly_h3
 WITH (
     format              = 'PARQUET',
     parquet_compression = 'SNAPPY',
-    external_location   = 's3://knap-ais-bronze-silver/gold/uid_hourly_h3/',
+    external_location   = 's3://knap-ais/gold/uid_hourly_h3/',
     partitioned_by      = ARRAY['dt', 'hour'],
     bucketed_by         = ARRAY['mmsi'],
     bucket_count        = 64

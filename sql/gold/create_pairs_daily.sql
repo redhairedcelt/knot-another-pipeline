@@ -5,7 +5,7 @@ CREATE TABLE knap_ais.pairs_daily
 WITH (
   format = 'PARQUET',
   parquet_compression = 'SNAPPY',
-  external_location = 's3://knap-ais-bronze-silver/gold/pairs_daily/',
+  external_location = 's3://knap-ais/gold/pairs_daily/',
   partitioned_by = ARRAY['year','month','day'],
   bucketed_by = ARRAY['uid_a','uid_b'],
   bucket_count = 32

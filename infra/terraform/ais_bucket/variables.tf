@@ -1,5 +1,5 @@
 variable "bucket_name" {
-  description = "Globally-unique name for the AIS bronze/silver bucket."
+  description = "Globally-unique name for the AIS bronze/silver/gold bucket."
   type        = string
 }
 

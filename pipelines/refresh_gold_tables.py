@@ -38,7 +38,7 @@ LOGGER = logging.getLogger("refresh_gold_tables")
 UID_TABLE_NAME = "uid_hourly_h3"
 PAIRS_TABLE_NAME = "pairs_daily"
 UID_EXTERNAL_FUNCTION = "arn:aws:lambda:us-east-1:058264100453:function:H3UDF"
-DEFAULT_ATHENA_OUTPUT = "s3://knap-ais-bronze-silver/athena-results/"
+DEFAULT_ATHENA_OUTPUT = "s3://knap-ais/athena-results/"
 
 
 @dataclass
@@ -572,8 +572,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--gold-root",
-        default="s3://knap-ais-bronze-silver/gold",
-        help="Root S3 prefix for the gold datasets (default s3://knap-ais-bronze-silver/gold).",
+        default="s3://knap-ais/gold",
+        help="Root S3 prefix for the gold datasets (default s3://knap-ais/gold).",
     )
     parser.add_argument(
         "--mode",

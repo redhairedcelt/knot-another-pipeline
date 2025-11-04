@@ -1,6 +1,6 @@
 # AIS Bucket Module
 
-This Terraform module provisions a secure S3 bucket intended to back the AIS bronze and silver layers produced by `pipelines/ais_pipeline.py`.
+This Terraform module provisions a secure S3 bucket intended to back the AIS bronze, silver, and gold layers produced by `pipelines/ais_pipeline.py`.
 
 ## Features
 
@@ -15,7 +15,7 @@ This Terraform module provisions a secure S3 bucket intended to back the AIS bro
 ```hcl
 module "ais_bucket" {
   source      = "./infra/terraform/ais_bucket"
-  bucket_name = "knap-ais-bronze-silver"
+  bucket_name = "knap-ais"
   aws_region  = "us-east-1"
   tags = {
     Environment = "dev"
@@ -29,7 +29,7 @@ Initialise and apply:
 ```bash
 cd infra/terraform/ais_bucket
 terraform init
-terraform apply -var="bucket_name=knap-ais-bronze-silver" -var="aws_region=us-east-1"
+terraform apply -var="bucket_name=knap-ais" -var="aws_region=us-east-1"
 ```
 
-Extend the module by attaching IAM roles and policies that allow your orchestration runtime (ECS task, Lambda function, or Step Functions activities) to read `bronze/*` and read/write `silver/*`.
+Extend the module by attaching IAM roles and policies that allow your orchestration runtime (ECS task, Lambda function, or Step Functions activities) to read `bronze/*` and read/write `silver/*` and `gold/*`.

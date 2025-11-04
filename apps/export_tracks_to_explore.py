@@ -8,10 +8,10 @@ the first two MMSIs (or `solo` if only one is provided) and the start timestamp.
 
 Example:
 
-    python notebooks/export_tracks_to_explore.py \
+    python apps/export_tracks_to_explore.py \
         --start 2025-01-01 \
         --stop  2025-01-03T12:00:00 \
-        --mmsi 636016432 257972000 366999120 \
+        --mmsi <mmsi1> <mmsi2> ... \
         --staging-dir s3://my-athena-results/ \
         --region us-east-1
 """

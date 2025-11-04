@@ -17,16 +17,90 @@ This project relies on the publicly available [NOAA Marine Cadastre Vessel Traff
 
 ## Apps
 ### Geo-Temporal Data Explorer
-Built using Streamlit and PyDeck, this application lets analysts load a CSV file, visualize vessel tracks on an interactive map, adjust a time slider, and select specific track IDs or UIDs. The companion script `notebooks/export_tracks_to_explore.py` accepts a date range and a list of MMSIs, generating a CSV under `data/interim/tracks_to_explore/` for deeper investigation. Launch instructions and Streamlit configuration live in the `apps` directory.
+Built using Streamlit and PyDeck, this application lets analysts load a CSV file, visualize vessel tracks on an interactive map, adjust a time slider, and select specific track IDs or UIDs. Launch instructions and Streamlit configuration live in the `apps` directory. Generate CSV extracts for the app with:
+
+```bash
+python apps/export_tracks_to_explore.py \
+  --start 2025-01-01 \
+  --stop  2025-01-03T12:00:00 \
+  --mmsi <mmsi1> <mmsi2> ... \
+  --staging-dir s3://knap-ais/athena-results/ \
+  --region us-east-1
+```
+
+The script queries Athena for the requested MMSIs/time window and writes results under `data/interim/tracks_to_explore/`.
 
 ## Getting Started
 
-- Spin up the shared conda environment (default name `knap`): `conda env update --file apps/environment.yml` and then `conda activate knap`.
-- Review the AIS ingestion docs at `docs/ais_pipeline.md` for end-to-end guidance on downloading NOAA AIS data, landing it in a bronze S3 layer, and curating a silver Parquet dataset.
-- Provision infrastructure with the Terraform module in `infra/terraform/ais_bucket` when you are ready to run the pipeline in AWS.
-- Review `docs/data_contracts.md` for the bronze and silver data contracts before building downstream (gold) layers.
-- Ensure AWS credentials (access key/secret or role-based auth) are available in your environment before running any S3/Athena scripts.
-- Consult the repo-level task list in `TODO.md` for outstanding work items.
+Before you begin, configure AWS credentials (environment variables or `AWS_PROFILE`) and install Terraform ≥ 1.6, the AWS CLI, and Conda.
+
+1. **Create the Python environment**
+   ```bash
+   conda env update --file apps/environment.yml --prune
+   conda activate knap
+   ```
+
+2. **Provision infrastructure (S3 bucket and Glue catalog)**
+   ```bash
+   cd infra/terraform/ais_bucket
+   terraform init
+   terraform apply
+
+   cd ../ais_glue_catalog
+   terraform init
+   terraform apply
+   ```
+   The Terraform variables file (`terraform.tfvars`) lets you set the bucket name, region, and tags. See `docs/terraform_setup.md` for a full walkthrough and example values.
+
+3. **Ingest NOAA data to bronze and silver**
+   ```bash
+   cd ../../..
+   python pipelines/ais_pipeline.py run \
+     --bucket knap-ais \
+     --region us-east-1 \
+     --start-date 2025-01-01 \
+     --end-date 2025-01-31 \
+     --create-bucket
+   ```
+   Adjust the date window to match the archives you want to load.
+
+4. **Refresh the Glue catalog**
+   ```bash
+   aws glue start-crawler --name knap-ais-silver
+   aws glue get-crawler --name knap-ais-silver --query 'Crawler.State'
+   ```
+   Wait until the crawler reports `READY`; the `silver_ais` table will then be visible in Athena.
+
+5. **Build gold tables in Athena**
+   ```bash
+   python pipelines/refresh_gold_tables.py \
+     --start-date 2025-01-01 \
+     --end-date 2025-01-31 \
+     --region us-east-1 \
+     --athena-output s3://knap-ais/athena-results/ \
+     --gold-root s3://knap-ais/gold \
+     --mode replace
+   ```
+   Use `--mode append` for incremental refreshes.
+
+6. **Verify the results**
+   ```bash
+   aws s3 ls s3://knap-ais/bronze/ais/year=2025/month=01/day=01/
+   aws s3 ls s3://knap-ais/silver/ais/year=2025/month=01/day=01/
+   aws s3 ls s3://knap-ais/gold/ --recursive | head
+   ```
+   Review `docs/data_contracts.md` for schema expectations and consult `docs/ais_pipeline.md` for deeper pipeline details. Track outstanding tasks in `TODO.md`.
+
+7. **Export tracks for the Geo-Temporal Data Explorer (optional)**
+   ```bash
+   python apps/export_tracks_to_explore.py \
+     --start 2025-01-01 \
+     --stop 2025-01-03T12:00:00 \
+     --mmsi <mmsi1> <mmsi2> ... \
+     --staging-dir s3://knap-ais/athena-results/ \
+     --region us-east-1
+   ```
+   The script writes CSV files to `data/interim/tracks_to_explore/` for use in the Streamlit app. Provide at least one MMSI and ensure the staging directory matches your Athena results bucket.
 
 ## Pipelines
 ### Bronze → Silver Pipeline
@@ -46,7 +120,7 @@ The gold layer currently includes two tables:
 
 - **`sql/gold/create_uid_hourly_h3.sql`** distills billions of unique geospatial points into averaged hourly geospatial per ship. It cleans up the messy NOAA timestamps with a tiered `TRY_CAST`/ISO normaliser and writes the summary bucketed by hashed `mmsi` while partitioning by `dt/hour`. To make comparison of trajectories easier, the pipeline calls an H3 Lambda UDF on the averaged latitude/longitude for every vessel-hour—so downstream joins snap to hexagons instead of compute intensive distance calculations. 
 
-- **`notebooks/create_pairs_daily`** builds on that curated dataset to surface daily co-movement pairs. It joins the hourly table to itself on matching `dt`, `hour`, and `h3_index`, enforcing `a.mmsi < b.mmsi` to prevent symmetric duplicates while still letting the planner prune partitions. The script then projects hyper-local overlap metrics (`hT` for hours together and `gT` for geohashes together) plus two Jaccard similarity scores for temporal and spatial agreement, finally averaging them into a Geo-Temporal Jaccard (`gtj`) score.
+- **`sql/gold/create_pairs_daily.sql`** builds on that curated dataset to surface daily co-movement pairs. It joins the hourly table to itself on matching `dt`, `hour`, and `h3_index`, enforcing `a.mmsi < b.mmsi` to prevent symmetric duplicates while still letting the planner prune partitions. The script then projects hyper-local overlap metrics (`hT` for hours together and `gT` for geohashes together) plus two Jaccard similarity scores for temporal and spatial agreement, finally averaging them into a Geo-Temporal Jaccard (`gtj`) score.
 
 
 - The design contract for the hourly H3 mart lives in `docs/data_contracts.md` (`gold/uid_hourly_h3`) and now includes a companion pairs table fed from the hourly output.
@@ -61,20 +135,13 @@ The gold layer currently includes two tables:
   python pipelines/refresh_gold_tables.py \
     --start-date 2025-01-01 \
     --end-date 2025-01-31 \
-    --athena-output s3://knap-ais-bronze-silver/athena-results/ \
+    --athena-output s3://knap-ais/athena-results/ \
     --mode replace
   ```
 -  The script assumes the H3 Lambda UDF is deployed and that the AWS CLI can reach the bucket for the optional cleanup steps.
 - An Athena CTAS template is still provided at `sql/gold/create_uid_hourly_h3.sql` for quick experimentation or bespoke backfills; update the date filters before running it by hand.
 - Future orchestration can wrap the refresh script or wire it into Step Functions/Airflow once the daily cadence is nailed down.
-- To pull silver-layer track points for one or more MMSIs over a time window, run
-  ```
-  python notebooks/export_tracks_to_explore.py \
-    --start 2025-01-01 \
-    --stop  2025-01-03T12:00:00 \
-    --mmsi <mmsi1> <mmsi2> ... 
-  ```
-  The script saves `~/Documents/projects/knot-another-pipeline/data/interim/tracks_to_explore/tracks_<mmsi1>_<mmsi2>_<start>.csv`, ready to load into the Geo‑Temporal Data Explorer app for map-based inspection.
+- To pull silver-layer track points for one or more MMSIs over a time window, use Athena/Trino queries based on the SQL templates under `sql/`. Export subsets as CSV for the Geo‑Temporal Data Explorer when needed.
 
 ## Analysis
 

@@ -38,7 +38,7 @@ python pipelines/ais_pipeline.py preview --year 2025 --limit 5
 Ingest a month of data into a freshly provisioned bucket:
 ```bash
 python pipelines/ais_pipeline.py run \
-  --bucket knap-ais-bronze-silver \
+  --bucket knap-ais \
   --region us-east-1 \
   --start-date 2025-01-01 \
   --end-date 2025-01-31 \
@@ -82,20 +82,22 @@ When adapting either CTAS:
 
 The Terraform module under `infra/terraform/ais_bucket` provisions a minimal S3 bucket with encryption, versioning, and a managed bucket policy suitable for AIS data. Run it as follows:
 
+> Need a full walkthrough? See `docs/terraform_setup.md` for end-to-end Terraform instructions.
+
 ```bash
 cd infra/terraform/ais_bucket
 terraform init
-terraform apply -var="bucket_name=knap-ais-bronze-silver" -var="aws_region=us-east-1"
+terraform apply -var="bucket_name=knap-ais" -var="aws_region=us-east-1"
 ```
 
-Outputs include the bucket ARN for referencing in future IAM roles or event triggers. Extend the module by attaching IAM policies that bind the pipeline execution role (for ECS, Lambda, or Step Functions) to read/write the `bronze` and `silver` prefixes.
+Outputs include the bucket ARN for referencing in future IAM roles or event triggers. Extend the module by attaching IAM policies that bind the pipeline execution role (for ECS, Lambda, or Step Functions) to read `bronze/*` and read/write both the `silver/*` and `gold/*` prefixes.
 
 To make the silver layer queryable from Athena, use the Glue catalog module in `infra/terraform/ais_glue_catalog`:
 
 ```bash
 cd infra/terraform/ais_glue_catalog
 terraform init
-terraform apply -var="bucket_name=knap-ais-bronze-silver"
+terraform apply -var="bucket_name=knap-ais"
 ```
 
 After apply, start the `knap-ais-silver` crawler in the AWS console (or add a schedule) so the `silver_` tables appear in the `knap_ais` database.
