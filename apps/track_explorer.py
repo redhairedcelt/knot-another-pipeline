@@ -13,9 +13,13 @@ from pathlib import Path
 st.set_page_config(page_title="Track Explorer", layout="wide")
 st.title("Track Explorer — Streamlit + PyDeck")
 
-# Default data file packaged with the project (falls back to empty string if missing)
-_default_data = Path(__file__).resolve().parent / "data" / "raw" / "sf_cabs_10" / "cabs_10.csv"
-DEFAULT_PATH = str(_default_data) if _default_data.exists() else ""
+# Default data directory under data/interim/tracks_to_explore; fallback to empty string.
+_interim_dir = Path(__file__).resolve().parent.parent / "data" / "interim" / "tracks_to_explore"
+if _interim_dir.exists():
+    csv_candidates = sorted(_interim_dir.glob("*.csv"))
+    DEFAULT_PATH = str(csv_candidates[0]) if csv_candidates else ""
+else:
+    DEFAULT_PATH = ""
 
 # ----------------------------
 # HELPERS

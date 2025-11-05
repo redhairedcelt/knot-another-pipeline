@@ -30,6 +30,15 @@ python apps/export_tracks_to_explore.py \
 
 The script queries Athena for the requested MMSIs/time window and writes results under `data/interim/tracks_to_explore/`.
 
+Launch the Streamlit app locally with:
+
+```bash
+conda activate knap
+streamlit run apps/track_explorer.py
+```
+
+Streamlit prints a local URL (default http://localhost:8501) after it starts.
+
 ## Getting Started
 
 Before you begin, configure AWS credentials (environment variables or `AWS_PROFILE`) and install Terraform ≥ 1.6, the AWS CLI, and Conda.
