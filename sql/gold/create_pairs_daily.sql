@@ -20,12 +20,12 @@ SELECT
   ub.geo_cnt AS gB,
   p.hT,
   p.gT,
-  CAST(p.hT AS DOUBLE) / NULLIF(ua.win_cnt + ub.win_cnt - p.hT, 0) AS temporal_j,
-  CAST(p.gT AS DOUBLE) / NULLIF(ua.geo_cnt + ub.geo_cnt - p.gT, 0) AS spatial_j,
+  CAST(p.hT AS DOUBLE) / NULLIF(LEAST(ua.win_cnt, ub.win_cnt), 0) AS temporal_o,
+  CAST(p.gT AS DOUBLE) / NULLIF(LEAST(ua.geo_cnt, ub.geo_cnt), 0) AS spatial_o,
   0.5 * (
-    CAST(p.hT AS DOUBLE) / NULLIF(ua.win_cnt + ub.win_cnt - p.hT, 0) +
-    CAST(p.gT AS DOUBLE) / NULLIF(ua.geo_cnt + ub.geo_cnt - p.gT, 0)
-  ) AS gtj,
+    CAST(p.hT AS DOUBLE) / NULLIF(LEAST(ua.win_cnt, ub.win_cnt), 0) +
+    CAST(p.gT AS DOUBLE) / NULLIF(LEAST(ua.geo_cnt, ub.geo_cnt), 0)
+  ) AS gto,
   -- partition columns LAST and matching partitioned_by:
   year(p.dt)  AS year,
   month(p.dt) AS month,

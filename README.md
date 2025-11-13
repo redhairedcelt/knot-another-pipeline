@@ -129,7 +129,7 @@ The gold layer currently includes two tables:
 
 - **`sql/gold/create_uid_hourly_h3.sql`** distills billions of unique geospatial points into averaged hourly geospatial per ship. It cleans up the messy NOAA timestamps with a tiered `TRY_CAST`/ISO normaliser and writes the summary bucketed by hashed `mmsi` while partitioning by `dt/hour`. To make comparison of trajectories easier, the pipeline calls an H3 Lambda UDF on the averaged latitude/longitude for every vessel-hour—so downstream joins snap to hexagons instead of compute intensive distance calculations. 
 
-- **`sql/gold/create_pairs_daily.sql`** builds on that curated dataset to surface daily co-movement pairs. It joins the hourly table to itself on matching `dt`, `hour`, and `h3_index`, enforcing `a.mmsi < b.mmsi` to prevent symmetric duplicates while still letting the planner prune partitions. The script then projects hyper-local overlap metrics (`hT` for hours together and `gT` for geohashes together) plus two Jaccard similarity scores for temporal and spatial agreement, finally averaging them into a Geo-Temporal Jaccard (`gtj`) score.
+- **`sql/gold/create_pairs_daily.sql`** builds on that curated dataset to surface daily co-movement pairs. It joins the hourly table to itself on matching `dt`, `hour`, and `h3_index`, enforcing `a.mmsi < b.mmsi` to prevent symmetric duplicates while still letting the planner prune partitions. The script projects hyper-local overlap metrics (`hT` for hours together and `gT` for geohashes together) plus two overlap coefficients for temporal and spatial agreement, finally averaging them into a Geo-Temporal Overlap (`gto`) score.
 
 
 - The design contract for the hourly H3 mart lives in `docs/data_contracts.md` (`gold/uid_hourly_h3`) and now includes a companion pairs table fed from the hourly output.
@@ -152,9 +152,26 @@ The gold layer currently includes two tables:
 - Future orchestration can wrap the refresh script or wire it into Step Functions/Airflow once the daily cadence is nailed down.
 - To pull silver-layer track points for one or more MMSIs over a time window, use Athena/Trino queries based on the SQL templates under `sql/`. Export subsets as CSV for the Geo‑Temporal Data Explorer when needed.
 
+### Metric Rationale
+
+Co-travel similarity now uses the **overlap coefficient** (also known as the Szymkiewicz–Simpson coefficient) instead of Jaccard similarity. Given two sets of H3 hexes for a ship pair, A and B, the repository computes:
+
+- `Overlap(A, B) = |A ∩ B| / min(|A|, |B|)`
+- `Geo-Temporal Overlap (gto) = 0.5 * (temporal_overlap + spatial_overlap)`
+
+Using the minimum cardinality in the denominator ensures the metric expresses “what fraction of the smaller track is covered by the intersection,” which is critical for AIS where vessels frequently report at very different rates. A sparse transmitter can be fully contained within a dense track; Jaccard would still score that pair near zero because `|A ∪ B|` is dominated by the dense ship, while the overlap coefficient correctly emits `1.0`.
+
+Example (dense vs. sparse AIS tracks):
+
+- Ship A visits 6 hexes, Ship B visits 24 hexes, and all of A’s hexes appear in B.
+- `|A ∩ B| = 6`, `min(|A|, |B|) = 6`.
+- `Overlap(A,B) = 6/6 = 1.0` (the sparse track is entirely covered) whereas Jaccard would have been `6/24 = 0.25`.
+
+This change makes high `gto` scores reflective of genuine co-movement even when the reporting cadence between partners diverges sharply.  Shared pairs like 367369550/367515760 jump from 0.81 avg GTJ to 0.90 avg GTO, illustrating how the new metric better rewards “subset” trajectories. The `ntbks` dir includes exploration of both the original `gtj` and `gto` metrics.
+
 ## Analysis
 
 ### Co-Movement Identification
 Identifying ships that travel together over extended windows is central to understanding bottlenecks, shadow fleets, and coordinated patterns such as fishing operations. Naively looking for “similar trajectories” scales poorly, so the repo relies on the two gold tables described above.
 
-Together these scripts turn raw AIS data into an hour-by-hour hex grid and then into statistically defensible co-travel signals for further exploration by the Geo-Temporal Data Explorer app. It’s a compact, AWS-native workflow that leverages Athena’s strengths by pushing the heavy lifting into pre-aggregated gold tables, keeps everything partition-aware, and lets analysts focus on stories hiding in high `gtj` pairs.
+Together these scripts turn raw AIS data into an hour-by-hour hex grid and then into statistically defensible co-travel signals for further exploration by the Geo-Temporal Data Explorer app. It’s a compact, AWS-native workflow that leverages Athena’s strengths by pushing the heavy lifting into pre-aggregated gold tables, keeps everything partition-aware, and lets analysts focus on stories hiding in high `gto` pairs.

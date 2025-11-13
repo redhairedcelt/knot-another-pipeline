@@ -202,12 +202,12 @@ def _render_pairs_daily_select(
           ub.geo_cnt AS gB,
           p.hT,
           p.gT,
-          CAST(p.hT AS DOUBLE) / NULLIF(ua.win_cnt + ub.win_cnt - p.hT, 0) AS temporal_j,
-          CAST(p.gT AS DOUBLE) / NULLIF(ua.geo_cnt + ub.geo_cnt - p.gT, 0) AS spatial_j,
+          CAST(p.hT AS DOUBLE) / NULLIF(LEAST(ua.win_cnt, ub.win_cnt), 0) AS temporal_o,
+          CAST(p.gT AS DOUBLE) / NULLIF(LEAST(ua.geo_cnt, ub.geo_cnt), 0) AS spatial_o,
           0.5 * (
-            CAST(p.hT AS DOUBLE) / NULLIF(ua.win_cnt + ub.win_cnt - p.hT, 0) +
-            CAST(p.gT AS DOUBLE) / NULLIF(ua.geo_cnt + ub.geo_cnt - p.gT, 0)
-          ) AS gtj,
+            CAST(p.hT AS DOUBLE) / NULLIF(LEAST(ua.win_cnt, ub.win_cnt), 0) +
+            CAST(p.gT AS DOUBLE) / NULLIF(LEAST(ua.geo_cnt, ub.geo_cnt), 0)
+          ) AS gto,
           year(p.dt)  AS year,
           month(p.dt) AS month,
           day(p.dt)   AS day
@@ -343,9 +343,9 @@ def _render_pairs_final_ddl(
             gB BIGINT,
             hT BIGINT,
             gT BIGINT,
-            temporal_j DOUBLE,
-            spatial_j DOUBLE,
-            gtj DOUBLE
+            temporal_o DOUBLE,
+            spatial_o DOUBLE,
+            gto DOUBLE
         )
         PARTITIONED BY (year INT, month INT, day INT)
         CLUSTERED BY (uid_a, uid_b) INTO 32 BUCKETS
